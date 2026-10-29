@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:,">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sheet Practice</title>
+<script>
+/* Device profile is inlined so this page stays one file (no device.js). */
+(function () {
+  function applyDevice() {
+    var w = window.innerWidth;
+    var touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+    var form = w < 700 ? 'phone' : w < 1100 ? 'tablet' : 'desktop';
+    var root = document.documentElement;
+    root.classList.remove('device-phone', 'device-tablet', 'device-desktop', 'input-touch', 'input-fine');
+    root.classList.add('device-' + form, touch ? 'input-touch' : 'input-fine');
+  }
+  applyDevice();
+  window.addEventListener('resize', applyDevice);
+})();
+</script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f0f12;
+    --panel: #141418;
+    --ink: #f2efe6;
+    --muted: #b7b1a4;
+    --line: #2c2c34;
+    --gold: #e6b450;
+    --gold-ink: #ffe1a3;
+    --gold-dim: #3d3114;
+    --danger: #e7a0a0;
+    --ok: #c6e2a4;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.4 "Segoe UI", system-ui, sans-serif;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  header, #status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: #121216;
+    border-color: var(--line);
+    border-style: solid;
+  }
+  header { border-width: 0 0 1px; flex-wrap: wrap; }
+  h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    color: var(--gold-ink);
+  }
+  .header-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+  button, select, input, textarea {
+    font: inherit;
+    color: var(--ink);
+    background: #1c1c22;
+    border: 1px solid #3a3a44;
+    border-radius: 6px;
+  }
+  button {
+    min-height: 36px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  button:hover, select:hover, input:hover { border-color: var(--gold); }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+  }
+  button.active, button[aria-pressed="true"] {
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--gold-ink);
+  }
+  #play-btn { background: var(--gold-dim); border-color: var(--gold); color: var(--gold-ink); }
+  .app {
+    display: grid;
+    grid-template-columns: 268px minmax(0, 1fr);
+    min-height: 0;
+  }
+  aside {
+    overflow: auto;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 12px;
+  }
+  [hidden] { display: none !important; }
+  aside { position: relative; z-index: 4; user-select: none; }
+  .lede, .keys, .group label, #status-keys { color: var(--muted); }
+  .lede, .keys { margin: 0 0 12px; font-size: 13px; }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .group { margin-bottom: 14px; }
+  .group h2 {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .row > button { flex: 1 1 auto; }
+  select, input { width: 100%; padding: 8px; }
+  #stage {
+    position: relative;
+    min-height: 0;
+    overflow: auto;
+    background:
+      radial-gradient(1200px 400px at 20% -10%, rgba(230, 180, 80, 0.05), transparent 50%),
+      #101014;
+    touch-action: pan-y;
+  }
+  #quiz-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    overflow: hidden;
+    background: #16161c;
+    border-bottom: 1px solid var(--line);
+    padding: 8px 12px 0;
+  }
+  .quiz-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  #quiz-label { margin: 0; color: var(--gold-ink); font-size: 13px; }
+  #letter-pad button { min-width: 40px; padding-left: 0; padding-right: 0; }
+  #letter-pad button.pad-on, #interval-row button.pad-on {
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--gold-ink);
+    box-shadow: 0 0 0 2px var(--gold);
+  }
+  #quiz-feedback { margin: 6px 0; font-size: 13px; }
+  #quiz-staff { display: flex; justify-content: center; min-height: 150px; }
+  #score { min-height: 240px; padding-left: 12px; cursor: crosshair; user-select: none; overflow: hidden; }
+  #score svg, #quiz-staff svg { display: block; }
+  /* VexFlow stem metrics default to black. Recolor only those pixels so gold notes stay gold. */
+  #score svg [stroke="black"], #quiz-staff svg [stroke="black"],
+  #score svg [fill="black"], #quiz-staff svg [fill="black"],
+  #score svg [stroke="#000"], #quiz-staff svg [stroke="#000"],
+  #score svg [fill="#000"], #quiz-staff svg [fill="#000"],
+  #score svg [stroke="#000000"], #quiz-staff svg [stroke="#000000"],
+  #score svg [fill="#000000"], #quiz-staff svg [fill="#000000"] {
+    stroke: #d9d4c8;
+    fill: #f2efe6;
+  }
+  #pitch-tip {
+    position: fixed;
+    z-index: 6;
+    pointer-events: none;
+    padding: 2px 7px;
+    border: 1px solid var(--gold);
+    border-radius: 4px;
+    background: #1c1c22;
+    color: var(--gold-ink);
+    font-size: 13px;
+  }
+  #status {
+    border-width: 1px 0 0;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    font-size: 13px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+  #status-text { color: var(--ink); }
+  dialog {
+    width: min(640px, 94vw);
+    background: #1a1a20;
+    color: var(--ink);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+  textarea {
+    width: 100%;
+    resize: vertical;
+    padding: 8px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 13px;
+  }
+  .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  #quiz-feedback { min-height: 1.3em; margin: 8px 0 0; font-size: 13px; }
+  #quiz-feedback.ok { color: var(--ok); }
+  #quiz-feedback.bad { color: var(--danger); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .input-touch button, .input-touch select, .input-touch input { min-height: 44px; }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+    aside {
+      max-height: 42dvh;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+  }
+</style>
+</head>
+<body oncontextmenu="return false;">
+  <header>
+    <h1>Sheet Practice</h1>
+    <div class="header-actions">
+      <button type="button" id="new-btn">New</button>
+      <button type="button" id="save-btn">Save</button>
+      <button type="button" id="load-btn">Load</button>
+      <button type="button" id="play-btn">Play</button>
+      <button type="button" id="stop-btn">Stop</button>
+      <button type="button" id="abc-btn">ABC</button>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside>
+      <p class="lede">Click a line or space to enter a note. The name shows as you hover, and again when it lands.</p>
+
+      <section class="group">
+        <h2>Clef</h2>
+        <div class="row" id="clef-row">
+          <button type="button" data-clef="treble">Treble</button>
+          <button type="button" data-clef="bass">Bass</button>
+          <button type="button" data-clef="alto">Alto</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Key signature</h2>
+        <select id="key-select" aria-label="Key signature"></select>
+      </section>
+
+      <section class="group">
+        <h2>Time signature</h2>
+        <select id="time-select" aria-label="Time signature"></select>
+      </section>
+
+      <section class="group">
+        <h2>Duration</h2>
+        <div class="row" id="dur-row">
+          <button type="button" data-dur="w" title="1">Whole</button>
+          <button type="button" data-dur="h" title="2">Half</button>
+          <button type="button" data-dur="q" title="3">Quarter</button>
+          <button type="button" data-dur="8" title="4">Eighth</button>
+          <button type="button" data-dur="16" title="5">16th</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Entry</h2>
+        <div class="row">
+          <button type="button" id="rest-btn" aria-pressed="false">Rest</button>
+          <button type="button" data-acc="#" aria-pressed="false" title="Sharp">♯</button>
+          <button type="button" data-acc="b" aria-pressed="false" title="Flat">♭</button>
+          <button type="button" data-acc="n" aria-pressed="false" title="Natural">♮</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Measures</h2>
+        <div class="row">
+          <button type="button" id="clear-btn">Clear measure</button>
+          <button type="button" id="add-btn">Add measure</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Learn</h2>
+        <button type="button" id="learn-toggle" aria-expanded="false">Open practice</button>
+        <div id="learn-panel" hidden>
+          <div class="tabs" role="tablist">
+            <button type="button" data-learn="name">Name the note</button>
+            <button type="button" data-learn="interval">Interval</button>
+            <button type="button" data-learn="scale">Scale</button>
+            <button type="button" data-learn="chord">Chord</button>
+          </div>
+
+          <p id="panel-name" class="lede">Tap a letter, or use a controller: left/right, A confirm, B new note, X hear.</p>
+
+          <div id="panel-interval" hidden>
+            <p class="lede">Pick the interval name above the question staff.</p>
+          </div>
+
+          <div id="panel-scale" hidden>
+            <label for="scale-root">Root</label>
+            <div class="row">
+              <select id="scale-root" aria-label="Scale root"></select>
+              <select id="scale-acc" aria-label="Scale accidental">
+                <option value="">Natural</option>
+                <option value="#">Sharp</option>
+                <option value="b">Flat</option>
+              </select>
+              <select id="scale-oct" aria-label="Scale octave"></select>
+            </div>
+            <label for="scale-type">Scale</label>
+            <select id="scale-type">
+              <option value="major">Major</option>
+              <option value="minor">Natural minor</option>
+              <option value="pentatonic">Major pentatonic</option>
+              <option value="pentatonic-minor">Minor pentatonic</option>
+            </select>
+            <button type="button" id="scale-place" style="margin-top:6px">Place scale</button>
+          </div>
+
+          <div id="panel-chord" hidden>
+            <label for="chord-root">Root</label>
+            <div class="row">
+              <select id="chord-root" aria-label="Chord root"></select>
+              <select id="chord-acc" aria-label="Chord accidental">
+                <option value="">Natural</option>
+                <option value="#">Sharp</option>
+                <option value="b">Flat</option>
+              </select>
+              <select id="chord-oct" aria-label="Chord octave"></select>
+            </div>
+            <label for="chord-quality">Quality</label>
+            <select id="chord-quality">
+              <option value="maj">Major</option>
+              <option value="min">Minor</option>
+              <option value="dim">Diminished</option>
+              <option value="aug">Augmented</option>
+              <option value="dom7">Dominant 7</option>
+              <option value="maj7">Major 7</option>
+              <option value="min7">Minor 7</option>
+              <option value="m7b5">Half-diminished 7</option>
+            </select>
+            <button type="button" id="chord-place" style="margin-top:6px">Place chord</button>
+          </div>
+        </div>
+      </section>
+      <p class="keys">1–5 duration · arrows select · Shift+arrows change pitch · Ctrl+Z undo · Space play/pause · Delete removes</p>
+    </aside>
+
+    <main id="stage">
+      <div id="quiz-wrap" hidden>
+        <div class="quiz-head">
+          <p id="quiz-label">Name this note</p>
+          <div id="quiz-answer" class="row">
+            <div id="letter-pad" class="row" role="group" aria-label="Letter name"></div>
+            <button type="button" id="name-new">New note</button>
+            <button type="button" id="name-hear">Hear</button>
+          </div>
+          <div id="quiz-interval" class="row" hidden>
+            <div class="row" id="interval-row"></div>
+            <button type="button" id="interval-new">New interval</button>
+            <button type="button" id="interval-hear">Hear</button>
+          </div>
+        </div>
+        <p id="quiz-feedback" aria-live="polite"></p>
+        <div id="quiz-staff"></div>
+      </div>
+      <div id="score" aria-label="Staff"></div>
+      <div id="pitch-tip" hidden></div>
+    </main>
+  </div>
+
+  <footer id="status">
+    <span id="status-text">Loading notation fonts…</span>
+    <span id="status-keys">1–5 duration · arrows select · Shift+arrows pitch · Ctrl+Z undo · Space play · Del remove</span>
+  </footer>
+
+  <dialog id="abc-dialog">
+    <h2 style="margin:0 0 8px; font-size:15px; color:#ffe1a3">ABC notation</h2>
+    <textarea id="abc-text" readonly rows="12"></textarea>
+    <div class="dialog-actions">
+      <button type="button" id="abc-copy">Copy</button>
+      <button type="button" id="abc-close">Close</button>
+    </div>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/vexflow@5.0.0/build/cjs/vexflow-core.js"></script>
+  <script>
+  /* global VexFlow */
+  (function () {
+    'use strict';
+
+    var STORAGE_KEY = 'sheet-practice-score';
+    var INK = '#f2efe6';
+    var LINE = '#d9d4c8';
+    var GOLD = '#e6b450';
+    var GOLD_HOT = '#ffd56a';
+    var TEMPO = 96;
+    var ROW = 236;
+    var LETTERS = ['c', 'd', 'e', 'f', 'g', 'a', 'b'];
+    var SEMI = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+    /* Line 0 is the TOP staff line in VexFlow. Each +0.5 line is one letter down. */
+    var CLEF_TOP = {
+      treble: { letter: 'f', octave: 5 },
+      bass: { letter: 'a', octave: 3 },
+      alto: { letter: 'g', octave: 4 }
+    };
+    var DUR_TICKS = { w: 16, h: 8, q: 4, '8': 2, '16': 1 };
+    var DUR_LABEL = { w: 'whole', h: 'half', q: 'quarter', '8': 'eighth', '16': 'sixteenth' };
+    var ACC_GLYPH = { '#': '♯', b: '♭', n: '♮', '##': '𝄪', bb: '𝄫' };
+    var KEYS = [
+      ['C', 'C major'], ['G', 'G major'], ['D', 'D major'], ['A', 'A major'],
+      ['E', 'E major'], ['B', 'B major'], ['F#', 'F♯ major'], ['C#', 'C♯ major'],
+      ['F', 'F major'], ['Bb', 'B♭ major'], ['Eb', 'E♭ major'], ['Ab', 'A♭ major'],
+      ['Db', 'D♭ major'], ['Gb', 'G♭ major'], ['Cb', 'C♭ major'],
+      ['Am', 'A minor'], ['Em', 'E minor'], ['Bm', 'B minor'], ['F#m', 'F♯ minor'],
+      ['C#m', 'C♯ minor'], ['G#m', 'G♯ minor'], ['D#m', 'D♯ minor'], ['A#m', 'A♯ minor'],
+      ['Dm', 'D minor'], ['Gm', 'G minor'], ['Cm', 'C minor'], ['Fm', 'F minor'],
+      ['Bbm', 'B♭ minor'], ['Ebm', 'E♭ minor'], ['Abm', 'A♭ minor']
+    ];
+    var TIMES = ['4/4', '3/4', '2/4', '2/2', '6/8', '3/8', '9/8', '12/8', '5/4', '7/8'];
+    var REL = {
+      Am: 'C', Em: 'G', Bm: 'D', 'F#m': 'A', 'C#m': 'E', 'G#m': 'B', 'D#m': 'F#', 'A#m': 'C#',
+      Dm: 'F', Gm: 'Bb', Cm: 'Eb', Fm: 'Ab', Bbm: 'Db', Ebm: 'Gb', Abm: 'Cb'
+    };
+    var SIG = {
+      C: {},
+      G: { f: '#' },
+      D: { f: '#', c: '#' },
+      A: { f: '#', c: '#', g: '#' },
+      E: { f: '#', c: '#', g: '#', d: '#' },
+      B: { f: '#', c: '#', g: '#', d: '#', a: '#' },
+      'F#': { f: '#', c: '#', g: '#', d: '#', a: '#', e: '#' },
+      'C#': { f: '#', c: '#', g: '#', d: '#', a: '#', e: '#', b: '#' },
+      F: { b: 'b' },
+      Bb: { b: 'b', e: 'b' },
+      Eb: { b: 'b', e: 'b', a: 'b' },
+      Ab: { b: 'b', e: 'b', a: 'b', d: 'b' },
+      Db: { b: 'b', e: 'b', a: 'b', d: 'b', g: 'b' },
+      Gb: { b: 'b', e: 'b', a: 'b', d: 'b', g: 'b', c: 'b' },
+      Cb: { b: 'b', e: 'b', a: 'b', d: 'b', g: 'b', c: 'b', f: 'b' }
+    };
+    var SCALES = {
+      major: { semis: [0, 2, 4, 5, 7, 9, 11, 12], letters: [0, 1, 2, 3, 4, 5, 6, 7] },
+      minor: { semis: [0, 2, 3, 5, 7, 8, 10, 12], letters: [0, 1, 2, 3, 4, 5, 6, 7] },
+      pentatonic: { semis: [0, 2, 4, 7, 9, 12], letters: [0, 1, 2, 4, 5, 7] },
+      'pentatonic-minor': { semis: [0, 3, 5, 7, 10, 12], letters: [0, 2, 3, 4, 6, 7] }
+    };
+    var CHORDS = {
+      maj: { semis: [0, 4, 7], letters: [0, 2, 4], minorKey: false },
+      min: { semis: [0, 3, 7], letters: [0, 2, 4], minorKey: true },
+      dim: { semis: [0, 3, 6], letters: [0, 2, 4], minorKey: true },
+      aug: { semis: [0, 4, 8], letters: [0, 2, 4], minorKey: false },
+      dom7: { semis: [0, 4, 7, 10], letters: [0, 2, 4, 6], minorKey: false },
+      maj7: { semis: [0, 4, 7, 11], letters: [0, 2, 4, 6], minorKey: false },
+      min7: { semis: [0, 3, 7, 10], letters: [0, 2, 4, 6], minorKey: true },
+      m7b5: { semis: [0, 3, 6, 10], letters: [0, 2, 4, 6], minorKey: true }
+    };
+    var INTERVALS = [
+      { id: 'm2', name: 'minor 2nd', semi: 1, letters: 1 },
+      { id: 'M2', name: 'major 2nd', semi: 2, letters: 1 },
+      { id: 'm3', name: 'minor 3rd', semi: 3, letters: 2 },
+      { id: 'M3', name: 'major 3rd', semi: 4, letters: 2 },
+      { id: 'P4', name: 'perfect 4th', semi: 5, letters: 3 },
+      { id: 'TT', name: 'tritone', semi: 6, letters: 3 },
+      { id: 'P5', name: 'perfect 5th', semi: 7, letters: 4 },
+      { id: 'm6', name: 'minor 6th', semi: 8, letters: 5 },
+      { id: 'M6', name: 'major 6th', semi: 9, letters: 5 },
+      { id: 'm7', name: 'minor 7th', semi: 10, letters: 6 },
+      { id: 'M7', name: 'major 7th', semi: 11, letters: 6 },
+      { id: 'P8', name: 'perfect octave', semi: 12, letters: 7 }
+    ];
+
+    var state = {
+      clef: 'treble',
+      key: 'C',
+      time: '4/4',
+      duration: 'q',
+      rest: false,
+      accidental: null,
+      measures: [{ notes: [] }],
+      selection: null,
+      activeMeasure: 0,
+      lastName: null,
+      message: '',
+      playing: false,
+      resumeAt: 0,
+      playCursor: null,
+      learnOpen: false,
+      learnTab: 'name',
+      padIndex: 0,
+      quizNote: null,
+      quizInterval: null,
+      scrollToEnd: false
+    };
+
+    var fontsReady = false;
+    var undoStack = [];
+    var systems = [];
+    var hitItems = [];
+    var audio = null;
+    var playTimers = [];
+    var liveGains = [];
+    var tipTimer = 0;
+
+    function $(id) { return document.getElementById(id); }
+
+    function accOff(acc) {
+      if (acc === '#') return 1;
+      if (acc === '##') return 2;
+      if (acc === 'b') return -1;
+      if (acc === 'bb') return -2;
+      return 0;
+    }
+
+    function keyAcc(key, letter) {
+      var major = REL[key] || key;
+      var map = SIG[major] || {};
+      return map[letter] || null;
+    }
+
+    function sigCount(key) {
+      return Object.keys(SIG[REL[key] || key] || {}).length;
+    }
+
+    function midiFrom(pitch, acc) {
+      return SEMI[pitch.letter] + (pitch.octave + 1) * 12 + accOff(acc);
+    }
+
+    function midiWritten(pitch) {
+      return midiFrom(pitch, pitch.acc === 'n' ? null : pitch.acc);
+    }
+
+    /* Printed accidentals win. A blank accidental follows the key signature. */
+    function soundingAcc(pitch) {
+      if (pitch.acc === 'n') return null;
+      if (pitch.acc) return pitch.acc;
+      return keyAcc(state.key, pitch.letter);
+    }
+
+    function midiSounding(pitch) {
+      return midiFrom(pitch, soundingAcc(pitch));
+    }
+
+    function freq(midi) {
+      return 440 * Math.pow(2, (midi - 69) / 12);
+    }
+
+    function prettyPitch(pitch, acc) {
+      var glyph = acc ? (ACC_GLYPH[acc] || '') : '';
+      return pitch.letter.toUpperCase() + glyph + pitch.octave;
+    }
+
+    function shownAcc(pitch) {
+      if (pitch.acc === 'n') return 'n';
+      if (pitch.acc) return pitch.acc;
+      return keyAcc(state.key, pitch.letter);
+    }
+
+    function prettyNote(note) {
+      if (!note) return '—';
+      if (note.rest) return 'rest';
+      return note.pitches.map(function (p) { return prettyPitch(p, shownAcc(p)); }).join(' ');
+    }
+
+    function keyLabel(key) {
+      for (var i = 0; i < KEYS.length; i++) if (KEYS[i][0] === key) return KEYS[i][1];
+      return key;
+    }
+
+    function measureCapacity() {
+      var parts = state.time.split('/');
+      var n = parseInt(parts[0], 10);
+      var d = parseInt(parts[1], 10);
+      return n * (16 / d);
+    }
+
+    function ticksOf(dur) { return DUR_TICKS[dur] || 4; }
+
+    function ticksUsed(measure) {
+      return measure.notes.reduce(function (sum, note) { return sum + ticksOf(note.duration); }, 0);
+    }
+
+    function largestDur(cap) {
+      var order = ['w', 'h', 'q', '8', '16'];
+      for (var i = 0; i < order.length; i++) if (ticksOf(order[i]) <= cap) return order[i];
+      return '16';
+    }
+
+    function hasNotes() {
+      return state.measures.some(function (m) { return m.notes.length > 0; });
+    }
+
+    function defaultOctave() {
+      if (state.clef === 'bass') return 3;
+      if (state.clef === 'alto') return 4;
+      return 4;
+    }
+
+    /* Map a VexFlow staff line (0 = top line, 0.5 = the space below it) to a letter. */
+    function pitchFromLine(line, clef) {
+      var ref = CLEF_TOP[clef] || CLEF_TOP.treble;
+      var stepsDown = Math.round(line * 2);
+      var idx = LETTERS.indexOf(ref.letter) - stepsDown;
+      var octave = ref.octave;
+      while (idx < 0) { idx += 7; octave -= 1; }
+      while (idx > 6) { idx -= 7; octave += 1; }
+      return { letter: LETTERS[idx], octave: octave };
+    }
+
+    function stepLetter(pitch, dir) {
+      var idx = LETTERS.indexOf(pitch.letter) + dir;
+      var octave = pitch.octave;
+      if (idx > 6) { idx = 0; octave += 1; }
+      if (idx < 0) { idx = 6; octave -= 1; }
+      octave = Math.max(1, Math.min(7, octave));
+      return { letter: LETTERS[idx], octave: octave, acc: null };
+    }
+
+    function spellDegree(root, letterOffset, semiOffset) {
+      var rootIndex = LETTERS.indexOf(root.letter);
+      var letter = LETTERS[(rootIndex + letterOffset) % 7];
+      var octave = root.octave + Math.floor((rootIndex + letterOffset) / 7);
+      var target = midiWritten(root) + semiOffset;
+      var natural = SEMI[letter] + (octave + 1) * 12;
+      var diff = target - natural;
+      if (diff > 6) { octave += 1; diff -= 12; }
+      if (diff < -6) { octave -= 1; diff += 12; }
+      var acc = null;
+      if (diff === 1) acc = '#';
+      else if (diff === -1) acc = 'b';
+      else if (diff === 2) acc = '##';
+      else if (diff === -2) acc = 'bb';
+      return { letter: letter, octave: octave, acc: acc };
+    }
+
+    function spellIntoKey(pitch, key) {
+      var fromKey = keyAcc(key, pitch.letter);
+      if (pitch.acc === '##' || pitch.acc === 'bb') return pitch;
+      if (pitch.acc === 'n' && !fromKey) return { letter: pitch.letter, octave: pitch.octave, acc: null };
+      var written = pitch.acc || null;
+      if (written === fromKey) return { letter: pitch.letter, octave: pitch.octave, acc: null };
+      if (!written && fromKey) return { letter: pitch.letter, octave: pitch.octave, acc: 'n' };
+      return { letter: pitch.letter, octave: pitch.octave, acc: pitch.acc || null };
+    }
+
+    function buildDegrees(root, spec) {
+      return spec.letters.map(function (letterOffset, i) {
+        return spellDegree(root, letterOffset, spec.semis[i]);
+      });
+    }
+
+    function validKeyName(letter, acc, minor) {
+      var name = letter.toUpperCase() + (acc === '#' ? '#' : acc === 'b' ? 'b' : '');
+      var id = minor ? name + 'm' : name;
+      for (var i = 0; i < KEYS.length; i++) if (KEYS[i][0] === id) return id;
+      return null;
+    }
+
+    /* ---------- ABC ---------- */
+    function abcOctave(letter, octave) {
+      var token = letter.toUpperCase();
+      if (octave >= 5) {
+        token = letter.toLowerCase();
+        for (var i = 6; i <= octave; i++) token += "'";
+        return token;
+      }
+      for (var o = octave; o < 4; o++) token += ',';
+      return token;
+    }
+
+    function abcAcc(acc) {
+      if (acc === '#') return '^';
+      if (acc === '##') return '^^';
+      if (acc === 'b') return '_';
+      if (acc === 'bb') return '__';
+      if (acc === 'n') return '=';
+      return '';
+    }
+
+    function abcNote(note) {
+      var mult = ticksOf(note.duration);
+      var length = mult === 1 ? '' : String(mult);
+      if (note.rest) return 'z' + length;
+      var bits = note.pitches.map(function (p) {
+        return abcAcc(p.acc) + abcOctave(p.letter, p.octave);
+      });
+      var body = bits.length > 1 ? '[' + bits.join('') + ']' : bits[0];
+      return body + length;
+    }
+
+    function toAbc() {
+      var clef = state.clef === 'treble' ? 'treble' : state.clef;
+      var body = state.measures.map(function (measure) {
+        if (!measure.notes.length) return 'z' + measureCapacity();
+        return measure.notes.map(abcNote).join(' ');
+      }).join(' | ');
+      return [
+        'X:1',
+        'T:Sheet Practice',
+        'M:' + state.time,
+        'L:1/16',
+        'Q:1/4=' + TEMPO,
+        'K:' + state.key + ' clef=' + clef,
+        body + ' |'
+      ].join('\n');
+    }
+
+    /* ---------- model edits ---------- */
+    function freshScore() {
+      state.clef = 'treble';
+      state.key = 'C';
+      state.time = '4/4';
+      state.duration = 'q';
+      state.rest = false;
+      state.accidental = null;
+      state.measures = [{ notes: [] }];
+      undoStack = [];
+      state.selection = null;
+      state.activeMeasure = 0;
+      state.lastName = null;
+      state.message = '';
+      state.resumeAt = 0;
+      state.playCursor = null;
+    }
+
+    function selectedNote() {
+      if (!state.selection) return null;
+      var measure = state.measures[state.selection.measure];
+      if (!measure) return null;
+      return measure.notes[state.selection.index] || null;
+    }
+
+    function rememberSelection(note) {
+      state.selection = null;
+      if (!note) return;
+      state.measures.forEach(function (measure, mi) {
+        var ni = measure.notes.indexOf(note);
+        if (ni >= 0) {
+          state.selection = { measure: mi, index: ni };
+          state.activeMeasure = mi;
+        }
+      });
+    }
+
+    function repack(notes) {
+      var cap = measureCapacity();
+      var kept = selectedNote();
+      var measures = [];
+      var cur = [];
+      var used = 0;
+      notes.forEach(function (note) {
+        if (ticksOf(note.duration) > cap) note.duration = largestDur(cap);
+        var t = ticksOf(note.duration);
+        if (cur.length && used + t > cap) {
+          measures.push({ notes: cur });
+          cur = [];
+          used = 0;
+        }
+        cur.push(note);
+        used += t;
+      });
+      measures.push({ notes: cur });
+      if (!measures.length) measures.push({ notes: [] });
+      state.measures = measures;
+      rememberSelection(kept);
+    }
+
+    function makeEntry(pitch) {
+      if (state.rest) return { rest: true, duration: state.duration, pitches: [] };
+      var written = state.accidental ? { letter: pitch.letter, octave: pitch.octave, acc: state.accidental } : { letter: pitch.letter, octave: pitch.octave, acc: null };
+      return { rest: false, duration: state.duration, pitches: [written] };
+    }
+
+    function cloneScore() {
+      return JSON.parse(JSON.stringify({
+        measures: state.measures,
+        selection: state.selection,
+        activeMeasure: state.activeMeasure,
+        lastName: state.lastName
+      }));
+    }
+
+    function undoPlacement() {
+      var prev = undoStack.pop();
+      if (!prev) {
+        state.message = 'Nothing to undo.';
+        updateStatus();
+        return;
+      }
+      state.measures = prev.measures;
+      state.selection = prev.selection;
+      state.activeMeasure = prev.activeMeasure;
+      state.lastName = prev.lastName;
+      state.message = 'Undone.';
+      stopPlayback(false);
+      render();
+    }
+
+    function addNoteAt(measureIndex, pitch) {
+      var before = cloneScore();
+      var note = makeEntry(pitch);
+      var cap = measureCapacity();
+      if (ticksOf(note.duration) > cap) note.duration = largestDur(cap);
+      var idx = measureIndex;
+      if (idx < 0) idx = 0;
+      while (state.measures.length < 64) {
+        if (!state.measures[idx]) state.measures.push({ notes: [] });
+        if (ticksUsed(state.measures[idx]) + ticksOf(note.duration) <= cap) break;
+        idx += 1;
+      }
+      if (!state.measures[idx] || ticksUsed(state.measures[idx]) + ticksOf(note.duration) > cap) {
+        state.measures = before.measures;
+        state.message = 'No room for that duration.';
+        updateStatus();
+        return;
+      }
+      undoStack.push(before);
+      if (undoStack.length > 80) undoStack.shift();
+      state.measures[idx].notes.push(note);
+      state.selection = { measure: idx, index: state.measures[idx].notes.length - 1 };
+      state.activeMeasure = idx;
+      state.lastName = prettyNote(note);
+      state.message = idx === measureIndex ? '' : 'Measure full. Placed in measure ' + (idx + 1) + '.';
+      stopPlayback(false);
+      render();
+    }
+
+    function deleteSelected() {
+      var sel = state.selection;
+      if (!sel) return;
+      var notes = state.measures[sel.measure].notes;
+      notes.splice(sel.index, 1);
+      if (!notes.length) {
+        state.selection = null;
+        state.lastName = null;
+      } else {
+        var ni = Math.min(sel.index, notes.length - 1);
+        state.selection = { measure: sel.measure, index: ni };
+        state.lastName = prettyNote(notes[ni]);
+      }
+      state.message = '';
+      stopPlayback(false);
+      render();
+    }
+
+    function flatNotes() {
+      var list = [];
+      state.measures.forEach(function (measure, mi) {
+        measure.notes.forEach(function (note, ni) {
+          list.push({ measure: mi, index: ni, note: note });
+        });
+      });
+      return list;
+    }
+
+    function moveSelection(delta) {
+      var list = flatNotes();
+      if (!list.length) return;
+      var idx = 0;
+      if (state.selection) {
+        idx = list.findIndex(function (item) {
+          return item.measure === state.selection.measure && item.index === state.selection.index;
+        });
+        if (idx < 0) idx = 0;
+        else idx = Math.max(0, Math.min(list.length - 1, idx + delta));
+      } else idx = delta < 0 ? list.length - 1 : 0;
+      var item = list[idx];
+      state.selection = { measure: item.measure, index: item.index };
+      state.activeMeasure = item.measure;
+      state.lastName = prettyNote(item.note);
+      state.message = '';
+      render();
+    }
+
+    function shiftSelection(dir) {
+      var note = selectedNote();
+      if (!note || note.rest) return;
+      note.pitches = note.pitches.map(function (p) { return stepLetter(p, dir); });
+      state.lastName = prettyNote(note);
+      state.message = '';
+      stopPlayback(false);
+      render();
+    }
+
+    function placePacked(noteList, message, nextKey) {
+      if (hasNotes() && !window.confirm('Replace the notes on the staff?')) return;
+      if (nextKey) state.key = nextKey;
+      undoStack = [];
+      var cap = measureCapacity();
+      noteList.forEach(function (note) {
+        if (ticksOf(note.duration) > cap) note.duration = largestDur(cap);
+      });
+      state.selection = null;
+      repack(noteList);
+      state.activeMeasure = 0;
+      state.lastName = noteList.length ? prettyNote(noteList[noteList.length - 1]) : null;
+      state.message = message;
+      stopPlayback(false);
+      render();
+    }
+
+    /* ---------- drawing ---------- */
+    function easyToken(note) {
+      if (note.rest) return 'B4/' + note.duration + '/r';
+      var parts = note.pitches.map(function (p) {
+        var acc = p.acc ? p.acc : '';
+        return p.letter.toUpperCase() + acc + p.octave;
+      });
+      if (parts.length > 1) return '(' + parts.join(' ') + ')/' + note.duration;
+      return parts[0] + '/' + note.duration;
+    }
+
+    function beamGroup(time) {
+      var parts = time.split('/');
+      var n = parseInt(parts[0], 10);
+      var d = parseInt(parts[1], 10);
+      if (d === 8 && n % 3 === 0) return [new VexFlow.Fraction(3, 8)];
+      return [new VexFlow.Fraction(1, 4)];
+    }
+
+    function paint(el, fill, stroke) {
+      if (el && typeof el.setStyle === 'function') {
+        el.setStyle({ fillStyle: fill, strokeStyle: stroke, lineWidth: 1 });
+      }
+    }
+
+    function drawMeasures(host, options) {
+      var clef = options.clef;
+      var key = options.key;
+      var time = options.time;
+      var measures = options.measures;
+      var interactive = !!options.interactive;
+      var rowH = options.rowHeight || ROW;
+      var staveY = options.staveY == null ? 8 : options.staveY;
+      host.innerHTML = '';
+      var avail = Math.max(host.clientWidth || 640, 280);
+      if (!interactive) avail = Math.min(avail, 460);
+      var minMeasure = (interactive ? 250 : 220) + sigCount(key) * 14;
+      var per = Math.max(1, Math.floor(avail / minMeasure));
+      if (!interactive) per = 1;
+      var rows = Math.ceil(measures.length / per) || 1;
+      var mWidth = Math.floor(avail / per);
+      var height = rows * rowH + (interactive ? 24 : 8);
+      var factory = new VexFlow.Factory({
+        renderer: {
+          elementId: host.id,
+          width: mWidth * per,
+          height: height,
+          backend: VexFlow.Renderer.Backends.SVG
+        }
+      });
+      var context = factory.getContext();
+      var easy = factory.EasyScore();
+      context.setFillStyle(INK);
+      context.setStrokeStyle(LINE);
+      var localHits = [];
+      var localSystems = [];
+
+      measures.forEach(function (measure, mi) {
+        var col = mi % per;
+        var row = Math.floor(mi / per);
+        var stave = new VexFlow.Stave(col * mWidth, row * rowH + staveY, mWidth - 8, { spacingBetweenLinesPx: 12 });
+        stave.setContext(context);
+        if (col === 0) {
+          stave.addClef(clef).addKeySignature(key).addTimeSignature(time);
+        }
+        stave.setMeasure(mi + 1);
+        paint(stave, INK, LINE);
+        stave.setDefaultLedgerLineStyle({ strokeStyle: LINE, lineWidth: 1 });
+        stave.getModifiers().forEach(function (mod) { paint(mod, INK, LINE); });
+        if (interactive && mi === options.activeMeasure) {
+          context.setFillStyle('rgba(230, 180, 80, 0.07)');
+          context.fillRect(stave.getX(), stave.getYForLine(-1.2), stave.getWidth(), stave.getYForLine(5.2) - stave.getYForLine(-1.2));
+          context.setFillStyle(INK);
+          context.setStrokeStyle(LINE);
+        }
+        stave.drawWithStyle();
+        if (interactive) localSystems.push({ measure: mi, stave: stave });
+        if (!measure.notes.length) return;
+
+        var vfNotes;
+        try {
+          vfNotes = easy.notes(measure.notes.map(easyToken).join(', '), { clef: clef, stem: 'auto' });
+        } catch (err) {
+          state.message = 'Could not build notes in measure ' + (mi + 1) + '.';
+          return;
+        }
+        vfNotes.forEach(function (vfNote, ni) {
+          var selected = options.selection && options.selection.measure === mi && options.selection.index === ni;
+          var playing = options.playCursor && options.playCursor.measure === mi && options.playCursor.index === ni;
+          var color = playing ? GOLD_HOT : selected ? GOLD : INK;
+          paint(vfNote, color, color);
+        });
+
+        var beams = [];
+        try {
+          beams = VexFlow.Beam.generateBeams(vfNotes, { groups: beamGroup(time) });
+        } catch (err) {
+          console.warn(err);
+          beams = [];
+        }
+        beams.forEach(function (beam) {
+          var notes = beam.notes || [];
+          var hot = notes.some(function (n) {
+            var style = n.getStyle ? n.getStyle() : null;
+            return style && (style.fillStyle === GOLD || style.fillStyle === GOLD_HOT);
+          });
+          paint(beam, hot ? GOLD : INK, hot ? GOLD : LINE);
+        });
+
+        try {
+          var voice = new VexFlow.Voice(time).setMode(VexFlow.Voice.Mode.SOFT);
+          voice.setStave(stave);
+          voice.addTickables(vfNotes);
+          var inner = Math.max(48, stave.getNoteEndX() - stave.getNoteStartX() - 8);
+          new VexFlow.Formatter().joinVoices([voice]).format([voice], inner);
+          voice.draw(context, stave);
+          beams.forEach(function (beam) {
+            beam.setContext(context);
+            beam.drawWithStyle();
+          });
+        } catch (err) {
+          state.message = 'Could not draw measure ' + (mi + 1) + '.';
+          console.error(err);
+          return;
+        }
+
+        if (!interactive) return;
+        vfNotes.forEach(function (vfNote, ni) {
+          var ys = vfNote.getYs ? vfNote.getYs() : [stave.getYForLine(2)];
+          var y = ys.reduce(function (sum, value) { return sum + value; }, 0) / ys.length;
+          localHits.push({
+            measure: mi,
+            index: ni,
+            note: vfNote,
+            model: measure.notes[ni],
+            x: vfNote.getAbsoluteX() + 8,
+            y: y
+          });
+        });
+      });
+
+      if (interactive) {
+        systems = localSystems;
+        hitItems = localHits;
+      }
+    }
+
+    function render() {
+      if (!fontsReady) return;
+      $('pitch-tip').hidden = true;
+      var stage = $('stage');
+      var top = stage.scrollTop;
+      var left = stage.scrollLeft;
+      try {
+        drawMeasures($('score'), {
+          clef: state.clef,
+          key: state.key,
+          time: state.time,
+          measures: state.measures,
+          interactive: true,
+          activeMeasure: state.activeMeasure,
+          selection: state.selection,
+          playCursor: state.playCursor
+        });
+        $('score').dataset.ready = '1';
+      } catch (err) {
+        console.error(err);
+        state.message = 'Could not draw the staff.';
+      }
+      layoutQuiz();
+      stage.scrollTop = top;
+      stage.scrollLeft = left;
+      if (state.scrollToEnd) {
+        stage.scrollTop = stage.scrollHeight;
+        state.scrollToEnd = false;
+      }
+      syncControls();
+      updateStatus();
+    }
+
+    function layoutQuiz() {
+      var wrap = $('quiz-wrap');
+      var show = state.learnOpen && (state.learnTab === 'name' || state.learnTab === 'interval');
+      wrap.hidden = !show;
+      if (!show || !fontsReady) return;
+      var label = state.learnTab === 'name' ? 'Name this note' : 'Name this interval';
+      $('quiz-label').textContent = label;
+      $('quiz-answer').hidden = state.learnTab !== 'name';
+      $('quiz-interval').hidden = state.learnTab !== 'interval';
+      var notes = state.learnTab === 'name'
+        ? [{ rest: false, duration: 'w', pitches: [state.quizNote] }]
+        : [
+          { rest: false, duration: 'q', pitches: [state.quizInterval.low] },
+          { rest: false, duration: 'q', pitches: [state.quizInterval.high] }
+        ];
+      var host = $('quiz-staff');
+      host.style.width = '100%';
+      drawMeasures(host, {
+        clef: state.clef,
+        key: 'C',
+        time: '4/4',
+        measures: [{ notes: notes }],
+        interactive: false,
+        activeMeasure: -1,
+        selection: null,
+        playCursor: null,
+        rowHeight: 188,
+        staveY: 0
+      });
+      var svg = host.querySelector('svg');
+      if (svg) {
+        svg.style.width = 'min(520px, 100%)';
+        svg.style.height = 'auto';
+      }
+    }
+
+    function syncControls() {
+      document.querySelectorAll('[data-clef]').forEach(function (btn) {
+        var on = btn.dataset.clef === state.clef;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      document.querySelectorAll('[data-dur]').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.dur === state.duration);
+      });
+      document.querySelectorAll('[data-acc]').forEach(function (btn) {
+        var on = btn.dataset.acc === state.accidental;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      $('rest-btn').classList.toggle('active', state.rest);
+      $('rest-btn').setAttribute('aria-pressed', state.rest ? 'true' : 'false');
+      $('key-select').value = state.key;
+      $('time-select').value = state.time;
+      $('play-btn').textContent = state.playing ? 'Pause' : 'Play';
+      document.querySelectorAll('[data-learn]').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.learn === state.learnTab);
+      });
+      $('learn-panel').hidden = !state.learnOpen;
+      $('panel-name').hidden = state.learnTab !== 'name';
+      $('panel-interval').hidden = state.learnTab !== 'interval';
+      $('panel-scale').hidden = state.learnTab !== 'scale';
+      $('panel-chord').hidden = state.learnTab !== 'chord';
+      $('learn-toggle').setAttribute('aria-expanded', state.learnOpen ? 'true' : 'false');
+      $('learn-toggle').textContent = state.learnOpen ? 'Close practice' : 'Open practice';
+      paintPad();
+    }
+
+    function answerButtons() {
+      var root = state.learnTab === 'interval' ? $('interval-row') : $('letter-pad');
+      var sel = state.learnTab === 'interval' ? '[data-interval]' : '[data-letter]';
+      return root ? Array.prototype.slice.call(root.querySelectorAll(sel)) : [];
+    }
+
+    function paintPad() {
+      var items = answerButtons();
+      if (!items.length) return;
+      if (state.padIndex < 0 || state.padIndex >= items.length) state.padIndex = 0;
+      items.forEach(function (btn, i) {
+        btn.classList.toggle('pad-on', i === state.padIndex);
+      });
+    }
+
+    function moveAnswer(dir) {
+      var items = answerButtons();
+      if (!items.length) return;
+      state.padIndex = (state.padIndex + dir + items.length) % items.length;
+      paintPad();
+    }
+
+    function confirmAnswer() {
+      var btn = answerButtons()[state.padIndex];
+      if (!btn) return;
+      if (btn.dataset.letter) checkLetter(btn.dataset.letter);
+      else btn.click();
+    }
+
+    function quizUsesPad() {
+      return state.learnOpen && (state.learnTab === 'name' || state.learnTab === 'interval');
+    }
+
+    var padMemory = { x: 0, buttons: {} };
+
+    function padDown(pad, index) {
+      var btn = pad.buttons[index];
+      return !!(btn && (btn.pressed || btn.value > 0.5));
+    }
+
+    function pollGamepad() {
+      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      var pad = null;
+      var i;
+      for (i = 0; i < pads.length; i++) if (pads[i]) pad = pads[i];
+      if (pad && quizUsesPad()) {
+        var x = pad.axes && pad.axes.length ? pad.axes[0] : 0;
+        var dir = 0;
+        if (x > 0.6 && padMemory.x <= 0.6) dir = 1;
+        if (x < -0.6 && padMemory.x >= -0.6) dir = -1;
+        if (padDown(pad, 15) && !padMemory.buttons[15]) dir = 1;
+        if (padDown(pad, 14) && !padMemory.buttons[14]) dir = -1;
+        if (dir) moveAnswer(dir);
+        if (padDown(pad, 0) && !padMemory.buttons[0]) confirmAnswer();
+        if (padDown(pad, 1) && !padMemory.buttons[1]) {
+          $(state.learnTab === 'name' ? 'name-new' : 'interval-new').click();
+        }
+        if (padDown(pad, 2) && !padMemory.buttons[2]) {
+          $(state.learnTab === 'name' ? 'name-hear' : 'interval-hear').click();
+        }
+        padMemory.x = x;
+        [0, 1, 2, 14, 15].forEach(function (n) { padMemory.buttons[n] = padDown(pad, n); });
+      }
+      window.requestAnimationFrame(pollGamepad);
+    }
+
+    function updateStatus() {
+      var clef = state.clef.charAt(0).toUpperCase() + state.clef.slice(1);
+      var dur = DUR_LABEL[state.duration] + (state.rest ? ' rest' : '');
+      var acc = state.accidental ? ACC_GLYPH[state.accidental] : '';
+      var parts = [clef, keyLabel(state.key), state.time, dur];
+      if (acc) parts.push(acc);
+      parts.push(state.lastName || '—');
+      var text = parts.join(' · ');
+      if (state.message) text += ' · ' + state.message;
+      if (state.playing) text = 'Playing · ' + text;
+      $('status-text').textContent = text;
+    }
+
+    /* ---------- pointer ---------- */
+    function svgPoint(event) {
+      var svg = $('score').querySelector('svg');
+      if (!svg) return null;
+      var rect = svg.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      var width = svg.width.baseVal && svg.width.baseVal.value ? svg.width.baseVal.value : rect.width;
+      var height = svg.height.baseVal && svg.height.baseVal.value ? svg.height.baseVal.value : rect.height;
+      return {
+        x: (event.clientX - rect.left) * (width / rect.width),
+        y: (event.clientY - rect.top) * (height / rect.height)
+      };
+    }
+
+    function findSystem(x, y) {
+      for (var i = 0; i < systems.length; i++) {
+        var stave = systems[i].stave;
+        if (x < stave.getX() || x > stave.getX() + stave.getWidth()) continue;
+        if (y < stave.getYForLine(-5.5) || y > stave.getYForLine(10)) continue;
+        return systems[i];
+      }
+      return null;
+    }
+
+    function hitTest(x, y) {
+      /* Keep this tight. Notes are spaced across the measure, and a wide
+         target would select them instead of placing the next one. */
+      var slop = document.documentElement.classList.contains('input-touch') ? 18 : 12;
+      var best = null;
+      var bestScore = Infinity;
+      hitItems.forEach(function (item) {
+        var dx = x - item.x;
+        var dy = y - item.y;
+        if (Math.abs(dx) > slop || Math.abs(dy) > slop + 6) return;
+        var score = dx * dx + dy * dy;
+        if (score < bestScore) {
+          best = item;
+          bestScore = score;
+        }
+      });
+      return best;
+    }
+
+    function showTip(event, text) {
+      var tip = $('pitch-tip');
+      tip.hidden = false;
+      tip.textContent = text;
+      tip.style.left = (event.clientX + 14) + 'px';
+      tip.style.top = (event.clientY + 16) + 'px';
+    }
+
+    function previewName(pitch) {
+      var acc = state.accidental === 'n' || state.accidental ? state.accidental : keyAcc(state.key, pitch.letter);
+      if (acc === 'n') return prettyPitch(pitch, 'n');
+      return prettyPitch(pitch, acc);
+    }
+
+    function onPointerMove(event) {
+      var point = svgPoint(event);
+      if (!point) return;
+      var hit = hitTest(point.x, point.y);
+      if (hit) {
+        showTip(event, prettyNote(hit.model));
+        return;
+      }
+      var system = findSystem(point.x, point.y);
+      if (!system) {
+        $('pitch-tip').hidden = true;
+        return;
+      }
+      if (state.rest) {
+        showTip(event, 'Rest');
+        return;
+      }
+      var line = Math.round(system.stave.getLineForY(point.y) * 2) / 2;
+      line = Math.max(-5, Math.min(10, line));
+      showTip(event, previewName(pitchFromLine(line, state.clef)));
+    }
+
+    function onPointerDown(event) {
+      if (event.button !== 0) return;
+      var point = svgPoint(event);
+      if (!point) return;
+      var hit = hitTest(point.x, point.y);
+      if (hit) {
+        state.selection = { measure: hit.measure, index: hit.index };
+        state.activeMeasure = hit.measure;
+        state.lastName = prettyNote(hit.model);
+        state.message = '';
+        render();
+        showTip(event, state.lastName);
+        return;
+      }
+      var system = findSystem(point.x, point.y);
+      if (!system) return;
+      var line = Math.round(system.stave.getLineForY(point.y) * 2) / 2;
+      line = Math.max(-5, Math.min(10, line));
+      var pitch = pitchFromLine(line, state.clef);
+      addNoteAt(system.measure, pitch);
+      showTip(event, state.rest ? 'Rest' : (state.lastName || previewName(pitch)));
+      window.clearTimeout(tipTimer);
+      tipTimer = window.setTimeout(function () { $('pitch-tip').hidden = true; }, 1200);
+    }
+
+    /* ---------- playback ---------- */
+    function getAudio() {
+      if (!audio) audio = new AudioContext();
+      if (audio.state === 'suspended') audio.resume();
+      return audio;
+    }
+
+    function clearTimers() {
+      playTimers.forEach(function (id) { window.clearTimeout(id); });
+      playTimers = [];
+    }
+
+    function silence() {
+      var ctx = audio;
+      liveGains.forEach(function (gain) {
+        try {
+          gain.gain.cancelScheduledValues(ctx.currentTime);
+          gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        } catch (err) { /* already closed */ }
+      });
+      liveGains = [];
+    }
+
+    function scheduleTone(when, midis, seconds) {
+      var ctx = getAudio();
+      var master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, when);
+      master.gain.exponentialRampToValueAtTime(0.16, when + 0.02);
+      master.gain.exponentialRampToValueAtTime(0.0001, when + Math.max(0.06, seconds - 0.03));
+      master.connect(ctx.destination);
+      liveGains.push(master);
+      midis.forEach(function (midi) {
+        var osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq(midi), when);
+        osc.connect(master);
+        osc.start(when);
+        osc.stop(when + seconds + 0.02);
+      });
+    }
+
+    function playEvents() {
+      var list = flatNotes();
+      if (!list.length) {
+        state.message = 'Nothing to play.';
+        updateStatus();
+        return;
+      }
+      var ctx;
+      try {
+        ctx = getAudio();
+      } catch (err) {
+        state.playing = false;
+        state.message = 'Audio is unavailable in this browser.';
+        updateStatus();
+        return;
+      }
+      state.playing = true;
+      state.message = '';
+      var quarter = 60 / TEMPO;
+      var start = Math.max(0, state.resumeAt);
+      var when = ctx.currentTime + 0.06;
+      for (var i = start; i < list.length; i++) {
+        (function (index, at) {
+          var item = list[index];
+          var seconds = (ticksOf(item.note.duration) / 4) * quarter;
+          playTimers.push(window.setTimeout(function () {
+            if (!state.playing) return;
+            state.playCursor = { measure: item.measure, index: item.index };
+            state.resumeAt = index;
+            render();
+          }, Math.max(0, (at - ctx.currentTime) * 1000)));
+          if (!item.note.rest) {
+            scheduleTone(at, item.note.pitches.map(midiSounding), seconds);
+          }
+        })(i, when);
+        when += (ticksOf(list[i].note.duration) / 4) * quarter;
+      }
+      playTimers.push(window.setTimeout(function () {
+        if (!state.playing) return;
+        state.playing = false;
+        state.resumeAt = 0;
+        state.playCursor = null;
+        render();
+      }, Math.max(0, (when - ctx.currentTime) * 1000 + 40)));
+      updateStatus();
+    }
+
+    function pausePlayback() {
+      state.playing = false;
+      clearTimers();
+      silence();
+      render();
+    }
+
+    function togglePlay() {
+      if (state.playing) pausePlayback();
+      else playEvents();
+    }
+
+    function stopPlayback(redraw) {
+      state.playing = false;
+      state.resumeAt = 0;
+      state.playCursor = null;
+      clearTimers();
+      silence();
+      if (redraw !== false && fontsReady) render();
+    }
+
+    function playRaw(pitches, seconds) {
+      getAudio();
+      scheduleTone(audio.currentTime + 0.02, pitches.map(midiWritten), seconds || 0.45);
+    }
+
+    /* ---------- quiz ---------- */
+    function randomPitch() {
+      var span = state.clef === 'bass' ? [2, 3] : state.clef === 'alto' ? [3, 4] : [4, 5];
+      for (var i = 0; i < 24; i++) {
+        var letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+        var octave = span[0] + Math.floor(Math.random() * (span[1] - span[0] + 1));
+        var pitch = { letter: letter, octave: octave, acc: null };
+        var midi = midiWritten(pitch);
+        var low = state.clef === 'bass' ? 43 : state.clef === 'alto' ? 48 : 60;
+        var high = state.clef === 'bass' ? 59 : state.clef === 'alto' ? 67 : 81;
+        if (midi >= low && midi <= high) return pitch;
+      }
+      return { letter: 'c', octave: defaultOctave(), acc: null };
+    }
+
+    function randomInterval() {
+      var spec = INTERVALS[Math.floor(Math.random() * INTERVALS.length)];
+      var letters = spec.letters;
+      var semi = spec.semi;
+      if (spec.id === 'TT' && Math.random() < 0.5) letters = 4;
+      for (var i = 0; i < 24; i++) {
+        var low = randomPitch();
+        var high = spellDegree(low, letters, semi);
+        if (high.octave <= low.octave + 1 && high.octave >= 1 && high.octave <= 6) {
+          return { low: low, high: high, id: spec.id, name: spec.name };
+        }
+      }
+      return {
+        low: { letter: 'c', octave: 4, acc: null },
+        high: { letter: 'e', octave: 4, acc: null },
+        id: 'M3',
+        name: 'major 3rd'
+      };
+    }
+
+    function setFeedback(text, kind) {
+      var node = $('quiz-feedback');
+      node.textContent = text;
+      node.className = kind || '';
+    }
+
+    function checkLetter(guess) {
+      var letter = state.quizNote.letter;
+      if (guess === letter) setFeedback(letter.toUpperCase() + ' is right.', 'ok');
+      else setFeedback('That was ' + letter.toUpperCase() + '.', 'bad');
+    }
+
+    function readRoot(prefix) {
+      return {
+        letter: $(prefix + '-root').value,
+        acc: $(prefix + '-acc').value || null,
+        octave: parseInt($(prefix + '-oct').value, 10)
+      };
+    }
+
+    /* ---------- events ---------- */
+    function typingTarget(event) {
+      var tag = event.target && event.target.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA';
+    }
+
+    function bind() {
+      window.addEventListener('contextmenu', function (event) {
+        event.preventDefault();
+      }, true);
+      $('clef-row').addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-clef]');
+        if (!btn) return;
+        state.clef = btn.dataset.clef;
+        $('scale-oct').value = String(defaultOctave());
+        $('chord-oct').value = String(defaultOctave());
+        state.quizNote = randomPitch();
+        state.quizInterval = randomInterval();
+        state.message = '';
+        stopPlayback(false);
+        render();
+      });
+
+      $('key-select').addEventListener('change', function () {
+        state.key = $('key-select').value;
+        state.message = '';
+        render();
+      });
+
+      $('time-select').addEventListener('change', function () {
+        state.time = $('time-select').value;
+        repack(state.measures.flatMap(function (m) { return m.notes; }));
+        state.message = '';
+        stopPlayback(false);
+        render();
+      });
+
+      $('dur-row').addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-dur]');
+        if (!btn) return;
+        state.duration = btn.dataset.dur;
+        state.message = '';
+        syncControls();
+        updateStatus();
+      });
+
+      document.querySelectorAll('[data-acc]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          state.accidental = state.accidental === btn.dataset.acc ? null : btn.dataset.acc;
+          state.message = '';
+          syncControls();
+          updateStatus();
+        });
+      });
+
+      $('rest-btn').addEventListener('click', function () {
+        state.rest = !state.rest;
+        state.message = '';
+        syncControls();
+        updateStatus();
+      });
+
+      $('clear-btn').addEventListener('click', function () {
+        var measure = state.measures[state.activeMeasure];
+        if (measure) measure.notes = [];
+        state.selection = null;
+        state.lastName = null;
+        state.message = 'Cleared measure ' + (state.activeMeasure + 1) + '.';
+        stopPlayback(false);
+        render();
+      });
+
+      $('add-btn').addEventListener('click', function () {
+        if (state.measures.length >= 64) {
+          state.message = 'Measure limit reached.';
+          updateStatus();
+          return;
+        }
+        state.measures.push({ notes: [] });
+        state.activeMeasure = state.measures.length - 1;
+        state.scrollToEnd = true;
+        state.message = '';
+        render();
+      });
+
+      $('new-btn').addEventListener('click', function () {
+        if (hasNotes() && !window.confirm('Clear the score?')) return;
+        freshScore();
+        stopPlayback(false);
+        render();
+      });
+
+      $('save-btn').addEventListener('click', function () {
+        var payload = {
+          version: 1,
+          clef: state.clef,
+          key: state.key,
+          time: state.time,
+          duration: state.duration,
+          rest: state.rest,
+          accidental: state.accidental,
+          measures: state.measures,
+          abc: toAbc()
+        };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+          state.message = 'Saved.';
+        } catch (err) {
+          state.message = 'Could not save in this browser.';
+        }
+        updateStatus();
+      });
+
+      $('load-btn').addEventListener('click', function () {
+        var raw = null;
+        try { raw = localStorage.getItem(STORAGE_KEY); } catch (err) { raw = null; }
+        if (!raw) {
+          state.message = 'Nothing saved yet.';
+          updateStatus();
+          return;
+        }
+        try {
+          var data = JSON.parse(raw);
+          if (!data || !Array.isArray(data.measures)) throw new Error('bad');
+          state.clef = data.clef || 'treble';
+          state.key = data.key || 'C';
+          state.time = data.time || '4/4';
+          state.duration = data.duration || 'q';
+          state.rest = !!data.rest;
+          state.accidental = data.accidental || null;
+          state.measures = data.measures.map(function (measure) {
+            return { notes: Array.isArray(measure.notes) ? measure.notes : [] };
+          });
+          if (!state.measures.length) state.measures = [{ notes: [] }];
+          undoStack = [];
+          state.selection = null;
+          state.activeMeasure = 0;
+          state.lastName = null;
+          var last = flatNotes().pop();
+          if (last) state.lastName = prettyNote(last.note);
+          state.message = 'Loaded.';
+          stopPlayback(false);
+          render();
+        } catch (err) {
+          state.message = 'Could not read the saved score.';
+          updateStatus();
+        }
+      });
+
+      $('play-btn').addEventListener('click', togglePlay);
+      $('stop-btn').addEventListener('click', function () { stopPlayback(true); });
+
+      $('abc-btn').addEventListener('click', function () {
+        $('abc-text').value = toAbc();
+        $('abc-dialog').showModal();
+      });
+      $('abc-close').addEventListener('click', function () { $('abc-dialog').close(); });
+      $('abc-copy').addEventListener('click', function () {
+        var text = $('abc-text').value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            state.message = 'ABC copied.';
+            updateStatus();
+          }).catch(function () {
+            $('abc-text').focus();
+            $('abc-text').select();
+          });
+        } else {
+          $('abc-text').focus();
+          $('abc-text').select();
+        }
+      });
+
+      $('score').addEventListener('pointerdown', onPointerDown);
+      $('score').addEventListener('pointermove', onPointerMove);
+      $('score').addEventListener('pointerleave', function () { $('pitch-tip').hidden = true; });
+
+      $('learn-toggle').addEventListener('click', function () {
+        state.learnOpen = !state.learnOpen;
+        if (state.learnOpen && !state.quizNote) state.quizNote = randomPitch();
+        if (state.learnOpen && !state.quizInterval) state.quizInterval = randomInterval();
+        setFeedback('', '');
+        render();
+      });
+
+      document.querySelectorAll('[data-learn]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          state.learnTab = btn.dataset.learn;
+          state.padIndex = 0;
+          setFeedback('', '');
+          render();
+        });
+      });
+
+      $('letter-pad').addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-letter]');
+        if (!btn) return;
+        state.padIndex = LETTERS.indexOf(btn.dataset.letter);
+        paintPad();
+        checkLetter(btn.dataset.letter);
+      });
+      $('name-new').addEventListener('click', function () {
+        state.quizNote = randomPitch();
+        setFeedback('', '');
+        render();
+      });
+      $('name-hear').addEventListener('click', function () {
+        playRaw([state.quizNote], 0.7);
+      });
+
+      $('interval-row').addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-interval]');
+        if (!btn) return;
+        state.padIndex = answerButtons().indexOf(btn);
+        paintPad();
+        if (btn.dataset.interval === state.quizInterval.id) setFeedback(state.quizInterval.name + ' is right.', 'ok');
+        else setFeedback('That was a ' + state.quizInterval.name + '.', 'bad');
+      });
+      $('interval-new').addEventListener('click', function () {
+        state.quizInterval = randomInterval();
+        setFeedback('', '');
+        render();
+      });
+      $('interval-hear').addEventListener('click', function () {
+        playRaw([state.quizInterval.low], 0.42);
+        window.setTimeout(function () { playRaw([state.quizInterval.high], 0.55); }, 460);
+      });
+
+      $('scale-place').addEventListener('click', function () {
+        var root = readRoot('scale');
+        var spec = SCALES[$('scale-type').value];
+        var minor = $('scale-type').value === 'minor' || $('scale-type').value === 'pentatonic-minor';
+        var nextKey = validKeyName(root.letter, root.acc, minor);
+        var spellKey = nextKey || state.key;
+        var degrees = buildDegrees(root, spec).map(function (pitch) { return spellIntoKey(pitch, spellKey); });
+        var notes = degrees.map(function (pitch) {
+          return { rest: false, duration: 'q', pitches: [pitch] };
+        });
+        placePacked(notes, 'Scale on the staff.', nextKey);
+      });
+
+      $('chord-place').addEventListener('click', function () {
+        var root = readRoot('chord');
+        var spec = CHORDS[$('chord-quality').value];
+        var nextKey = validKeyName(root.letter, root.acc, spec.minorKey);
+        var spellKey = nextKey || state.key;
+        var pitches = buildDegrees(root, spec).map(function (pitch) { return spellIntoKey(pitch, spellKey); });
+        pitches.sort(function (a, b) { return midiWritten(a) - midiWritten(b); });
+        var note = { rest: false, duration: largestDur(measureCapacity()), pitches: pitches };
+        placePacked([note], 'Chord on the staff.', nextKey);
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (typingTarget(event)) return;
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+          event.preventDefault();
+          undoPlacement();
+          return;
+        }
+        if (event.target && event.target.tagName === 'SELECT' && (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+          return;
+        }
+        if (event.key >= '1' && event.key <= '5') {
+          state.duration = ['w', 'h', 'q', '8', '16'][Number(event.key) - 1];
+          state.message = '';
+          syncControls();
+          updateStatus();
+          return;
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          if (event.shiftKey) shiftSelection(event.key === 'ArrowUp' || event.key === 'ArrowRight' ? 1 : -1);
+          else moveSelection(event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1);
+          return;
+        }
+        if (event.code === 'Space') {
+          if (event.target && event.target.tagName === 'BUTTON') return;
+          event.preventDefault();
+          togglePlay();
+          return;
+        }
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+          event.preventDefault();
+          deleteSelected();
+        }
+      });
+
+      window.addEventListener('resize', function () {
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(render, 120);
+      });
+    }
+
+    var resizeTimer = 0;
+
+    function fillSelect(select, pairs) {
+      pairs.forEach(function (pair) {
+        var option = document.createElement('option');
+        option.value = pair[0];
+        option.textContent = pair[1];
+        select.appendChild(option);
+      });
+    }
+
+    function initControls() {
+      fillSelect($('key-select'), KEYS);
+      TIMES.forEach(function (time) {
+        var option = document.createElement('option');
+        option.value = time;
+        option.textContent = time;
+        $('time-select').appendChild(option);
+      });
+      ['scale-root', 'chord-root'].forEach(function (id) {
+        LETTERS.forEach(function (letter) {
+          var option = document.createElement('option');
+          option.value = letter;
+          option.textContent = letter.toUpperCase();
+          $(id).appendChild(option);
+        });
+      });
+      ['scale-oct', 'chord-oct'].forEach(function (id) {
+        [2, 3, 4, 5].forEach(function (oct) {
+          var option = document.createElement('option');
+          option.value = String(oct);
+          option.textContent = String(oct);
+          $(id).appendChild(option);
+        });
+        $(id).value = '4';
+      });
+      LETTERS.forEach(function (letter) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.letter = letter;
+        btn.textContent = letter.toUpperCase();
+        $('letter-pad').appendChild(btn);
+      });
+      state.padIndex = 0;
+      INTERVALS.forEach(function (spec) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.interval = spec.id;
+        btn.textContent = spec.id === 'TT' ? 'TT' : spec.id;
+        btn.title = spec.name;
+        $('interval-row').appendChild(btn);
+      });
+      state.quizNote = randomPitch();
+      state.quizInterval = randomInterval();
+    }
+
+    if (!window.VexFlow) {
+      $('status-text').textContent = 'VexFlow did not load.';
+      return;
+    }
+
+    initControls();
+    bind();
+    window.addEventListener('gamepadconnected', function () {
+      state.message = 'Controller connected. Left/right moves, A confirms.';
+      updateStatus();
+    });
+    window.requestAnimationFrame(pollGamepad);
+    updateStatus();
+    $('status-text').textContent = 'Loading notation fonts…';
+
+    VexFlow.loadFonts('Bravura', 'Academico').then(function () {
+      VexFlow.setFonts('Bravura', 'Academico');
+      fontsReady = true;
+      render();
+    }).catch(function () {
+      $('status-text').textContent = 'Could not load Bravura and Academico.';
+    });
+  })();
+  </script>
+<div style="position:fixed;right:6px;bottom:4px;z-index:2147483647;pointer-events:none;font:9px/1.2 system-ui,sans-serif;color:rgba(255,255,255,.55);text-shadow:0 0 2px #000,0 0 2px #000;user-select:none">&copy; 2026 cxmx-dev. All rights reserved.</div>
+</body>
+</html>
