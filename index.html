@@ -212,6 +212,12 @@
       border-bottom: 1px solid var(--line);
     }
   }
+  #touch-actions { display: none; margin: 8px 0; }
+  #touch-actions button { min-height: 52px; min-width: 96px; font-size: 1.05rem; flex: 1 1 0; }
+  .is-touch #touch-actions { display: flex; }
+  .is-touch #name-new, .is-touch #name-hear, .is-touch #interval-new, .is-touch #interval-hear { display: none; }
+  @media (pointer: coarse) { #touch-actions { display: flex; } }
+  .is-touch #letter-pad button, .is-touch #interval-row button { min-height: 48px; min-width: 48px; }
 </style>
 </head>
 <body oncontextmenu="return false;">
@@ -290,7 +296,8 @@
             <button type="button" data-learn="chord">Chord</button>
           </div>
 
-          <p id="panel-name" class="lede">Tap a letter, or use a controller: left/right, A confirm, B new note, X hear.</p>
+          <p id="panel-name" class="lede"><span id="hint-mode">Click a letter, or use the keyboard: Left/Right pick, Enter confirm, N new note, H hear.</span></p>
+          <p id="sound-hint" class="lede" hidden>Sound is off until you tap or press a key once.</p>
 
           <div id="panel-interval" hidden>
             <p class="lede">Pick the interval name above the question staff.</p>
@@ -360,6 +367,11 @@
             <button type="button" id="interval-new">New interval</button>
             <button type="button" id="interval-hear">Hear</button>
           </div>
+        </div>
+        <div id="touch-actions" class="row" role="group" aria-label="Answer actions">
+          <button type="button" id="act-confirm">Confirm</button>
+          <button type="button" id="act-new">New note</button>
+          <button type="button" id="act-hear">Hear</button>
         </div>
         <p id="quiz-feedback" aria-live="polite"></p>
         <div id="quiz-staff"></div>
@@ -797,6 +809,7 @@
     }
 
     function addNoteAt(measureIndex, pitch) {
+      previewPitch(pitch);
       var before = cloneScore();
       var note = makeEntry(pitch);
       var cap = measureCapacity();
@@ -879,6 +892,7 @@
       state.lastName = prettyNote(note);
       state.message = '';
       stopPlayback(false);
+      if (note.pitches[0]) previewPitch(note.pitches[0]);
       render();
     }
 
@@ -1187,6 +1201,33 @@
       return !!(btn && (btn.pressed || btn.value > 0.5));
     }
 
+    var touchSeen = false;
+    function gamepadPresent() {
+      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < pads.length; i++) if (pads[i]) return true;
+      return false;
+    }
+
+    function isTouch() {
+      return touchSeen || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+    }
+
+    function quizNew() { $(state.learnTab === 'name' ? 'name-new' : 'interval-new').click(); }
+    function quizHear() { $(state.learnTab === 'name' ? 'name-hear' : 'interval-hear').click(); }
+
+    function updateInputHint() {
+      var touch = isTouch();
+      document.documentElement.classList.toggle('is-touch', touch);
+      var el = $('hint-mode');
+      if (!el) return;
+      if (gamepadPresent()) el.textContent = 'Controller: left/right pick, A confirm, B new note, X hear.';
+      else if (touch) el.textContent = 'Tap a letter, then Confirm. New note gets another, Hear plays it.';
+      else el.textContent = 'Click a letter, or use the keyboard: Left/Right pick, Enter confirm, N new note, H hear.';
+      var n = $('act-new');
+      if (n) n.textContent = state.learnTab === 'interval' ? 'New interval' : 'New note';
+      updateSoundHint();
+    }
+
     function pollGamepad() {
       var pads = navigator.getGamepads ? navigator.getGamepads() : [];
       var pad = null;
@@ -1201,12 +1242,8 @@
         if (padDown(pad, 14) && !padMemory.buttons[14]) dir = -1;
         if (dir) moveAnswer(dir);
         if (padDown(pad, 0) && !padMemory.buttons[0]) confirmAnswer();
-        if (padDown(pad, 1) && !padMemory.buttons[1]) {
-          $(state.learnTab === 'name' ? 'name-new' : 'interval-new').click();
-        }
-        if (padDown(pad, 2) && !padMemory.buttons[2]) {
-          $(state.learnTab === 'name' ? 'name-hear' : 'interval-hear').click();
-        }
+        if (padDown(pad, 1) && !padMemory.buttons[1]) quizNew();
+        if (padDown(pad, 2) && !padMemory.buttons[2]) quizHear();
         padMemory.x = x;
         [0, 1, 2, 14, 15].forEach(function (n) { padMemory.buttons[n] = padDown(pad, n); });
       }
@@ -1331,10 +1368,55 @@
     }
 
     /* ---------- playback ---------- */
+    /* Sound engine. Browsers (and iOS especially) keep an AudioContext suspended
+       until it is created or resumed inside a real user gesture. Gamepad presses
+       are not gestures, so we unlock on the first tap/click/key and play a silent
+       buffer for iOS. Tones wait for 'running' before they are scheduled. */
     function getAudio() {
-      if (!audio) audio = new AudioContext();
-      if (audio.state === 'suspended') audio.resume();
+      if (!audio) {
+        var Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) throw new Error('no audio');
+        audio = new Ctor();
+        audio.onstatechange = updateSoundHint;
+      }
+      if (audio.state !== 'running' && audio.resume) {
+        try { audio.resume().then(updateSoundHint, function () {}); } catch (err) { /* old Safari */ }
+      }
       return audio;
+    }
+
+    function unlockAudio() {
+      try {
+        var ctx = getAudio();
+        var buf = ctx.createBuffer(1, 1, 22050);
+        var src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch (err) { /* no audio */ }
+      updateSoundHint();
+    }
+
+    function updateSoundHint() {
+      var el = document.getElementById('sound-hint');
+      if (el) el.hidden = !!(audio && audio.state === 'running') || !gamepadPresent();
+    }
+
+    /* Run fn(ctx) once the context is running (or right away if it already is). */
+    function withAudio(fn) {
+      var ctx;
+      try { ctx = getAudio(); } catch (err) { return false; }
+      if (ctx.state === 'running') { fn(ctx); return true; }
+      var done = false;
+      var go = function () { if (done) return; done = true; fn(ctx); };
+      try { ctx.resume().then(go, function () {}); } catch (err) { go(); }
+      window.setTimeout(function () { if (ctx.state === 'running') go(); }, 250);
+      return true;
+    }
+
+    function previewPitch(pitch) {
+      if (!pitch || !pitch.letter) return;
+      try { playRaw([pitch], 0.35); } catch (err) { /* ignore */ }
     }
 
     function clearTimers() {
@@ -1357,7 +1439,7 @@
       var ctx = getAudio();
       var master = ctx.createGain();
       master.gain.setValueAtTime(0.0001, when);
-      master.gain.exponentialRampToValueAtTime(0.16, when + 0.02);
+      master.gain.exponentialRampToValueAtTime(0.3, when + 0.02);
       master.gain.exponentialRampToValueAtTime(0.0001, when + Math.max(0.06, seconds - 0.03));
       master.connect(ctx.destination);
       liveGains.push(master);
@@ -1378,16 +1460,19 @@
         updateStatus();
         return;
       }
-      var ctx;
-      try {
-        ctx = getAudio();
-      } catch (err) {
+      var ok = withAudio(function (ctx) { if (state.playing) schedulePlayback(ctx, list); });
+      if (!ok) {
         state.playing = false;
         state.message = 'Audio is unavailable in this browser.';
         updateStatus();
         return;
       }
       state.playing = true;
+      state.message = '';
+      updateStatus();
+    }
+
+    function schedulePlayback(ctx, list) {
       state.message = '';
       var quarter = 60 / TEMPO;
       var start = Math.max(0, state.resumeAt);
@@ -1440,8 +1525,9 @@
     }
 
     function playRaw(pitches, seconds) {
-      getAudio();
-      scheduleTone(audio.currentTime + 0.02, pitches.map(midiWritten), seconds || 0.45);
+      withAudio(function (ctx) {
+        scheduleTone(ctx.currentTime + 0.03, pitches.map(midiWritten), seconds || 0.45);
+      });
     }
 
     /* ---------- quiz ---------- */
@@ -1487,6 +1573,7 @@
 
     function checkLetter(guess) {
       var letter = state.quizNote.letter;
+      previewPitch(state.quizNote);
       if (guess === letter) setFeedback(letter.toUpperCase() + ' is right.', 'ok');
       else setFeedback('That was ' + letter.toUpperCase() + '.', 'bad');
     }
@@ -1761,6 +1848,13 @@
         if (event.target && event.target.tagName === 'SELECT' && (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
           return;
         }
+        if (quizUsesPad() && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          var k = event.key.toLowerCase();
+          if (event.key === 'Enter' && !(event.target && event.target.tagName === 'BUTTON')) { event.preventDefault(); confirmAnswer(); return; }
+          if (k === 'n') { event.preventDefault(); quizNew(); return; }
+          if (k === 'h') { event.preventDefault(); quizHear(); return; }
+          if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !event.shiftKey) { event.preventDefault(); moveAnswer(event.key === 'ArrowRight' ? 1 : -1); return; }
+        }
         if (event.key >= '1' && event.key <= '5') {
           state.duration = ['w', 'h', 'q', '8', '16'][Number(event.key) - 1];
           state.message = '';
@@ -1858,7 +1952,18 @@
     window.addEventListener('gamepadconnected', function () {
       state.message = 'Controller connected. Left/right moves, A confirms.';
       updateStatus();
+      updateInputHint();
     });
+    window.addEventListener('gamepaddisconnected', updateInputHint);
+    ['pointerdown', 'touchend', 'keydown', 'mousedown'].forEach(function (type) {
+      window.addEventListener(type, unlockAudio, { capture: true, passive: true });
+    });
+    window.addEventListener('pointerdown', function (e) { if (e.pointerType === 'touch' && !touchSeen) { touchSeen = true; updateInputHint(); } }, { passive: true });
+    $('act-confirm').addEventListener('click', confirmAnswer);
+    $('act-new').addEventListener('click', quizNew);
+    $('act-hear').addEventListener('click', quizHear);
+    document.querySelectorAll('[data-learn]').forEach(function (b) { b.addEventListener('click', function () { window.setTimeout(updateInputHint, 0); }); });
+    updateInputHint();
     window.requestAnimationFrame(pollGamepad);
     updateStatus();
     $('status-text').textContent = 'Loading notation fonts…';

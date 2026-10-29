@@ -41,3 +41,4 @@ The page starts on an empty treble staff in 4/4, C major.
 2026-10-29
 • Name-the-note uses A–G buttons. A controller can move, confirm, deal a new question, and hear the note.
 • Interval buttons stay off that question. Sidebar clicks no longer block `1`–`5`, Ctrl+Z, Space, or Delete. The entry staff stays out of the sidebar.
+ Keyboard (Enter confirm, N new, H hear) and big touch buttons do what the controller does. Sound unlocks on the first tap or key, including iOS, and notes play as you place them.
